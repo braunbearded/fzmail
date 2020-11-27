@@ -30,7 +30,6 @@ BREAKING CHANGES ARE LIKELY TO HAPPEND!!!
 Pipe seperated mail profiles. One line per profile. Located in `$HOME/.config/mail-profiles`.
 
 ```
-$HOME/.config/mail-profiles
 mail@domain.tld|My Name <mail@domain.tld>|AbsolutePathToDraftFolder|AbsolutePathToSendFolder
 ```
 
