@@ -1,176 +1,213 @@
 #!/bin/sh
 
-mail_profiles="$HOME/.config/mail-profiles"
+profiles_path="$HOME/mail-profiles"
+recipients_path=""
+editor="nvim"
 
-operations="list
-new mail
-refresh sequenz
-exit"
+flag_delimiter=","
+
+fzf_header="row   |id |profile                  |folder;flags|date     |mails;subject       |from"
 
 mail_operations="read in editor
 read in browser
-mark as read=1
-mark as unread=2
-reply=3
-move to trash=3
+mark as read=S
+mark as unread=U
+reply=T
+move to trash=T
 move to folder
 download attachment(s)
 forward
-delete=3
-edit=3
+delete=T
+edit=T
 exit"
 
-#TODO
-# download attachment, edit
+nl="
+"
 
-mflagmv() {
-    mail_source="$(mflag "$2" "$1")"
-    mail_dest="$(echo "$mail_source" | sed "s/$3.*//")"
-    [ "$mail_source" = "$mail_dest" ] && return
-    mrefile "$mail_source" "$mail_dest"
+render_mail_tree() {
+    tmpcontent=$(mktemp -u)
+    tmpcounter1=$(mktemp -u)
+    echo 0 > "$tmpcounter1"
+    rep_entry="$1"
+    rep_content="$2"
+    while read -r profile; do
+        id="$(echo "$profile" | awk -F "|" '{print $1}')"
+        mail="$(echo "$profile" | awk -F "|" '{print $2}')"
+        mail_path="$(echo "$profile" | awk -F "|" '{print $4}')"
+        mail_path_length="${#mail_path}"
+        echo "$(( $(cat "$tmpcounter1")+1))" > "$tmpcounter1"
+        row_number="$(cat "$tmpcounter1")"
+        header="$(printf "%-6s|%-3s|%-25s\n" "$row_number" "$id" "$mail")"
+        header_placeholder="header_placeholder"
+        printf "%s\n%s\n%s\n" "$header_placeholder" "$header" "$header_placeholder" >> "$tmpcontent"
+        mdirs "$mail_path" | while read -r folder; do
+            folder_short="$(echo "$folder" | cut -c "$((mail_path_length + 2))-")"
+            mails="$(mlist "$mail_path/$folder_short")"
+            mail_count="$(echo "$mails" | wc -l)"
+            folder_format="$(echo "$folder_short" | cut -c 1-20)"
+            echo "$(( $(cat "$tmpcounter1")+1))" > "$tmpcounter1"
+            row_number="$(cat "$tmpcounter1")"
+            formatted_row="$(printf "%-6s|%-3s|%-25s|%-22s|%s" "$row_number" "$id" "$mail" "$folder_format" "($mail_count)")"
+            printf "%s\n" "$formatted_row" >> "$tmpcontent"
+            if [ "$rep_entry" = "$formatted_row" ]; then
+                folder_id="$row_number"
+                tmpcounter2=$(mktemp -u)
+                echo 0 > "$tmpcounter2"
+                echo "$rep_content" | while read -r mail_folder_entry; do
+                    subject="$(mshow -n -q -h subject "$mail_folder_entry" | cut -c 10-29)"
+                    date="$(date -d "$(mshow -n -q -h date "$mail_folder_entry" | grep -oE "[0-9]+ [A-Z][a-z][a-z] [0-9][0-9][0-9][0-9] [0-9][0-9]:[0-9][0-9]")" +"%Y-%m-%d %H:%M")"
+                    from="$(mshow -n -q -h from "$mail_folder_entry" | cut -c 7-)"
+                    echo "$(( $(cat "$tmpcounter1")+1))" > "$tmpcounter1"
+                    row_number="$(cat "$tmpcounter1")"
+                    echo "$(( $(cat "$tmpcounter2")+1))" > "$tmpcounter2"
+                    mail_counter="$(cat "$tmpcounter2")"
+                    flags="$(echo "$mail_folder_entry" | grep -oE "2$flag_delimiter.*" | cut -c 3-)"
+                    if [ "$(echo "$flags" | grep -o "S")" = "" ]; then
+                        flags="${flags}U"
+                    fi
+                    printf "%-6s|%-3s|%-25s|%-6s|%-6s|%-8s|%s|%-20s|%-20s\n" "$row_number" "$id" "$mail" "$folder_id" "$mail_counter" "$flags" "$date" "$subject" "$from" >> "$tmpcontent"
+                done
+                rm "$tmpcounter2"
+            fi
+        done
+        echo "$(( $(cat "$tmpcounter1")+1))" > "$tmpcounter1"
+        row_number="$(cat "$tmpcounter1")"
+        printf "%-6s|%-3s|%-25s|%s\n" "$row_number" "$id" "$mail" "<New Mail>" >> "$tmpcontent"
+    done < "$profiles_path"
+
+    rm "$tmpcounter1"
+    pre_content="$(cat "$tmpcontent")"
+    rm "$tmpcontent"
+    max_line_length="$(echo "$pre_content" | wc -L)"
+    header_delimiter="$(printf "%*s" "$max_line_length" " " | tr " " "-")"
+    echo "$pre_content" | sed "s/$header_placeholder/$header_delimiter/"
 }
 
-get_mail_flags() {
-    flag="$(echo "$@" | cut -c 2-2)"
-    case "$flag" in
-        ".") echo "2";;
-        " ") echo "1";;
-        "x") echo "3";;
-    esac
+get_mails() {
+    #$1 = profile id
+    #$2 = folder
+    profile="$(sed "$1!d" "$profiles_path")"
+    mail_path="$(echo "$profile" | awk -F "|" '{print $4}')/$2"
+    mlist "$mail_path"
 }
 
-filtered_operations() {
-    flag="$(get_mail_flags "$selected_mail")"
-    echo "$mail_operations" | grep -v "$flag" | cut -d '=' -f 1
+filter_operations() {
+    flags_regex="$(echo "$1" | awk '{print $1}' | grep -o . | awk '{output = $1 "|" output} END {print "(" substr(output, 1, length(output)-1) ")"}')"
+    echo "$mail_operations" | grep -v "$flags_regex" | cut -d '=' -f 1
 }
 
+get_sender() {
+    sed "$1!d" "$profiles_path" | awk -F "|" '{print $3}'
+}
+
+get_recipients() {
+    awk -F "|" '{print $4}' "$profiles_path" | xargs -I "{}" sh -c "find {} -type f ! -name '.*'" | maddr | sort -u
+}
+
+fzf_add_list() {
+    #$1 = input to choose from
+    #$2 = prompt
+    #$3 = preselected values
+    data="$(printf "%s\nexit" "$1")"
+    if [ "$3" != "" ]; then
+        list="$3, "
+        multiline_list="$(echo "$list" | sed "s/,/\n/g" | awk '{$1=$1;print}')$nl$data"
+        options="$(echo "$multiline_list" | sort | uniq -u)"
+    else
+        options="$data"
+    fi
+
+    while [ "$options" != "exit" ]; do
+        selected="$(echo "$options" | fzf --prompt "$2(${list%??})")"
+        [ "$selected" = "exit" ] || [ "$selected" = "" ] && { options="exit"; continue; }
+        list="$selected, $list"
+        multiline_list="$(echo "$list" | sed "s/,/\n/g" | awk '{$1=$1;print}')$nl$data"
+        options="$(echo "$multiline_list" | sort | uniq -u)"
+    done
+    echo "${list%??}"
+}
+
+generate_mail() {
+    if [ "$1" = "new" ] && [ -d "$2" ]; then
+        draft_path="$2"
+        shift
+        shift
+        while [ "$1" != "" ]; do
+            case $1 in
+                -f) from="$2"; shift;;
+                -t) to="$2"; shift;;
+                -c) cc="$2"; shift;;
+                -b) bcc="$2"; shift;;
+                -l) flag="$2"; shift;;
+                -s) subject="$2"; shift;;
+                -h) other_header="$2"; shift;;
+                -o) content="$2"; shift;;
+            esac
+            shift
+        done
+        message_id="$(mgenmid)"
+        printf "To: %s\nCc: %s\nBcc: %s\nFrom: %s\nMessage-Id: %s\nSubject: %s\n%s\n\n%s" "$to" "$cc" "$bcc" "$from" "$message_id" "$subject" "$other_header" "$content" | mdeliver -v -c -XD "$draft_path"
+    fi
+}
+
+render=true
 while true; do
-    selected_mail=""
-    selected_mail_operation=""
-    selected_id=""
+    if [ "$render" = true ]; then
+        tree="$(render_mail_tree "$selected_entry" "$mails_folder")"
+    fi
 
-    selected_operation="$(echo "$operations" | fzf --prompt "Select operation type: ")"
-    [ "$selected_operation" = "" ] && exit
+    selected_entry="$(echo "$tree" | fzf --tac --header "$fzf_header" | tr -d "\n")"
+    [ "$selected_entry" = "" ] && exit
 
-    if [ "$selected_operation" = "list" ]; then
-        selected_mail="$(mscan -f '%c%u%r %-3n %16D %17f %t %15F %t %2i%s' | fzf --prompt "Select mail(s) to work on: " \
-            --preview 'mshow -N -n -A "text/plain" "$(echo {} | grep -oE "^....[0-9]*" | cut -c 5-)"')"
-        [ "$selected_mail" = "" ] && continue
+    selected_type="$(echo "$selected_entry" | awk -F "|" '{print $4}')"
+    selected_profile_id="$(echo "$selected_entry" | awk -F "|" '{print $2}')"
 
-        selected_mail_operation="$(filtered_operations | fzf --prompt "What to do with selected mail(s)? ")"
+    if [ "$selected_type" = "<New Mail>" ]; then
+        from="$(get_sender "$selected_profile_id")"
+        to="$(fzf_add_list "$(get_recipients)" "To: ")"
+        cc="$(fzf_add_list "$(get_recipients)" "Cc: ")"
+        bcc="$(fzf_add_list "$(get_recipients)" "Bcc: ")"
+        # draft="$(generate_mail "new" "$(get_profile "draft" "$selected_sender")" -f "$from" -t "$to" -c "$cc" -b "$bcc" -l "D")"
+        # eval "$open_mail $draft" # TODO
+        # send_mail "$draft" "$(get_profile "ident" "$selected_sender")" # TODO
+    fi
+
+    if [ "${#selected_type}" = 6 ]; then
+        render=false
+        flags="$selected_type"
+        selected_mail_operation="$(filter_operations "$flags" | fzf --prompt "What to do with selected mail(s)? ")"
         [ "$selected_mail_operation" = "" ] || [ "$selected_mail_operation" = "exit" ] && continue
 
-        selected_id="$(echo "$selected_mail" | grep -oE "^....[0-9]*" | cut -c 5-)"
-        if [ "$selected_mail_operation" = "mark as read" ]; then
-            # TODO check if valid id
-            mflagmv "$selected_id" "-S" "\/new\/"
-        fi
+        folder_id="$(echo "$selected_entry" | awk -F "|" '{print $4}')"
+        mail_id="$(echo "$selected_entry" | awk -F "|" '{print $5}')"
+        folder="$(echo "$tree" | grep -E "^$folder_id" | awk -F "|" '{print $4}' | xargs)"
+        mail_path="$(get_mails "$selected_profile_id" "$folder" | sed "$mail_id!d")"
 
-        if [ "$selected_mail_operation" = "mark as unread" ]; then
-            # TODO check if valid id
-            mflagmv "$selected_id" "-s" "\/cur\/"
-        fi
+        [ "$selected_mail_operation" = "read in editor" ] && mshow -N -n "$mail_path" | "$editor" -c "set buftype=nofile" -c "setfiletype mail" -
 
-        if [ "$selected_mail_operation" = "read in editor" ]; then
-            mshow -N -n "$selected_id" | nvim -c "set buftype=nofile" -c "setfiletype mail" -
-        fi
+        [ "$selected_mail_operation" = "read in browser" ] && mshow -h "" -N -n -A "text/html" "$mail_path" | firefox "data:text/html;base64,$(base64 -w 0 <&0)"
 
-        if [ "$selected_mail_operation" = "read in browser" ]; then
-            mshow -h "" -N -n -A "text/html" "$selected_id" | firefox "data:text/html;base64,$(base64 -w 0 <&0)"
-            # TODO switch to window
-        fi
+        [ "$selected_mail_operation" = "delete" ] && rm "$mail_path" && render=true
 
-        if [ "$selected_mail_operation" = "delete" ]; then
-            rm "$(mseq "$selected_id")"
-        fi
+        [ "$selected_mail_operation" = "mark as read" ] && echo "TODO"
 
-        if [ "$selected_mail_operation" = "move to folder" ]; then
-            selected_folder="$(echo "$selected_mail" | cut -c 46-63)"
-            target_folders="$(mdirs "$MAILDIR" | grep -v "$selected_folder" | fzf --prompt "Move folder to: ")"
-            [ "$target_folders" = "" ] && continue
-            mail_source="$(mseq "$selected_id")"
-            [ "$(echo "$target_folders" | grep -o "Trash")" = "Trash" ] && mail_source="$(mflag "-T" "$selected_id")"
-            mrefile "$mail_source" "$target_folders"
-        fi
+        [ "$selected_mail_operation" = "mark as unread" ] && echo "TODO"
 
-        if [ "$selected_mail_operation" = "move to trash" ]; then
-            selected_folder="$(echo "$selected_mail" | cut -c 46-63)"
-            target_folders="$(dirname "$(dirname "$(dirname "$(mseq 1)")")")/Trash"
-            [ "$(echo "$selected_folder" | grep -o "Trash")" = "Trash" ] && continue
-            mail_source="$(mflag "-T" "$selected_id")"
-            mrefile "$mail_source" "$target_folders"
-        fi
+        [ "$selected_mail_operation" = "move to folder" ] && echo "TODO"
 
-        if [ "$selected_operation" = "reply" ]; then
-            from="$(cat "$(mseq "$selected_id")" | grep -i "from:" | grep -oE "\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,6}\b")"
-            from_long="$(cat "$(mseq "$selected_id")" | grep -i "from:" | cut -c 7-)"
-            to="$(cut -d "|" -f 1 "$mail_profiles" | fzf --prompt "To: ")"
-            to_old="$(cat "$(mseq "$selected_id")" | grep -i "to:" | cut -c 5-)"
-            cc="$(cut -d "|" -f 1 "$mail_profiles" | fzf --prompt "Cc (ESC for none): ")"
-            cc_old="$(cat "$(mseq "$selected_id")" | grep -i "cc:" | cut -c 5-)"
-            bcc="$(cut -d "|" -f 1 "$mail_profiles" | fzf --prompt "Bcc (ESC for none): ")"
-            bcc_old="$(cat "$(mseq "$selected_id")" | grep -i "bcc:" | cut -c 6-)"
-            new_message_id="$(mgenmid)"
-            old_message_id="$(cat "$(mseq "$selected_id")" | grep -i "message-id:" | cut -c 13-)"
-            new_subject="Re: $(cat "$(mseq "$selected_id")" | grep -i "subject:" | cut -c 10-)"
-            draft_maildir="$(grep "$from" "$mail_profiles" | cut -d "|" -f 3)"
-            quote_start="$from_long wrote:"
-            content="$(mshow -O "$selected_id" 2 | sed -e 's/^/> /')"
+        [ "$selected_mail_operation" = "move to trash" ] && echo "TODO"
 
-            draft_file="$(printf "To: %s\nCc: %s\nBcc: %s\nSubject: %s\nFrom: %s\nReferences: %s\nIn-Reply-To: %s\nMessage-Id: %s\n\n%s\n%s" "$from" "$cc" "$bcc" "$new_subject" "$to_old" "$old_message_id" "$old_message_id" "$new_message_id" "$quote_start" "$content" | mdeliver -v -c -XD "$draft_maildir")"
-            nvim -c "setfiletype mail" "$draft_file"
-            send_draft="$(printf "Yes\nNo" | fzf --prompt "Send draft?")"
-            if [ "$send_draft" = "Yes" ]; then
-                # sent_maildir="$(grep "$from" "$mail_profiles" | cut -d "|" -f 4)"
-                mail_source="$(mflag "-d" "$draft_file")"
-                # mrefile "$mail_source" "$sent_maildir"
-            fi
-        fi
+        [ "$selected_mail_operation" = "reply" ] && echo "TODO"
 
-        if [ "$selected_operation" = "forward" ]; then
-            from="$(cat "$(mseq "$selected_id")" | grep -i "from:" | grep -oE "\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,6}\b")"
-            from_long="$(cat "$(mseq "$selected_id")" | grep -i "from:" | cut -c 7-)"
-            draft_maildir="$(grep "$from" "$mail_profiles" | cut -d "|" -f 3)"
-            cc_old="$(cat "$(mseq "$selected_id")" | grep -i "cc:" | cut -c 5-)"
-            bcc_old="$(cat "$(mseq "$selected_id")" | grep -i "bcc:" | cut -c 6-)"
-            to="$(cut -d "|" -f 1 "$mail_profiles" | fzf --prompt "To: ")"
-            new_subject="Fwd: $(cat "$(mseq "$selected_id")" | grep -i "subject:" | cut -c 10-)"
-            content="message/rfc822#inline /path/to/inbox/cur/1606464263.7133_1.slapacer,U=1:2,S>"
+        [ "$selected_mail_operation" = "forward" ] && echo "TODO"
 
-            draft_file="$(printf "To: %s\nCc: %s\nBcc: %s\nSubject: %s\nFrom: %s\nReferences: %s\nIn-Reply-To: %s\nMessage-Id: %s\n\n%s\n%s" "$from" "$cc" "$bcc" "$new_subject" "$to_old" "$old_message_id" "$old_message_id" "$new_message_id" "$quote_start" "$content" | mdeliver -v -c -XD "$draft_maildir")"
-            nvim -c "setfiletype mail" "$draft_file"
-            send_draft="$(printf "Yes\nNo" | fzf --prompt "Send draft?")"
-            if [ "$send_draft" = "Yes" ]; then
-                mail_source="$(mflag "-d" "$draft_file")"
-            fi
-        fi
+        [ "$selected_mail_operation" = "download attachment(s)" ] && echo "TODO"
+
+        [ "$selected_mail_operation" = "edit" ] && echo "TODO"
     fi
 
-    if [ "$selected_operation" = "refresh sequenz" ]; then
-        mdirs "$MAILDIR" | mlist | mseq -S
-    fi
-
-    if [ "$selected_operation" = "exit" ]; then
-        exit
-    fi
-
-    if [ "$selected_operation" = "new mail" ]; then
-        from="$(cut -d "|" -f 1 "$mail_profiles" | fzf -d "|" -n 1 --prompt "From: ")"
-        to="$(cut -d "|" -f 1 "$mail_profiles" | fzf --prompt "To: ")"
-        cc="$(cut -d "|" -f 1 "$mail_profiles" | fzf --prompt "Cc (ESC for none): ")"
-        bcc="$(cut -d "|" -f 1 "$mail_profiles" | fzf --prompt "Bcc (ESC for none): ")"
-        message_id="$(mgenmid)"
-        draft_maildir="$(grep "$from" "$mail_profiles" | cut -d "|" -f 3)"
-        draft_file="$(printf "To: %s\nCc: %s\nBcc: %s\nSubject: \nFrom: %s\nMessage-Id: %s\n\n" "$to" "$cc" "$bcc" "$from" "$message_id" | mdeliver -v -c -XD "$draft_maildir")"
-        nvim -c "setfiletype mail" "$draft_file"
-        send_draft="$(printf "Yes\nNo" | fzf --prompt "Send draft?")"
-        if [ "$send_draft" = "Yes" ]; then
-            # sent_maildir="$(grep "$from" "$mail_profiles" | cut -d "|" -f 4)"
-            mail_source="$(mflag "-d" "$draft_file")"
-            # mrefile "$mail_source" "$sent_maildir"
-        fi
+    if [ "${#selected_type}" = 22 ]; then
+        folder="$(echo "$selected_entry" | awk -F "|" '{print $4}' | xargs)"
+        mails_folder="$(get_mails "$selected_profile_id" "$folder")"
     fi
 done
-
-
-
