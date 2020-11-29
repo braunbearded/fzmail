@@ -1,17 +1,22 @@
 # fzmail
 
 fzmail is a terminal based mail client. It allows you to work on your mails
-(create mails, reply, forward, etc.) which are saved in maildir format.
-As front end or gui fzmail use fzf so you can fuzzy search world. Emails can
-be displayed in your favorite text editor or browser.
+(create mails, reply, forward, etc.) like any other mail client but in your
+loved terminal.
+fzmail heavily relies on fzf as its front end. This makes it possible to search,
+jump, move mail, etc. by arrow keys or by fuzzy searching.
+Emails can be displayed in more detail in your favorite text editor or browser.
 
-To use fzmail copy the shell script some, set relevant enviroment variables
-and execute the script.
+## Installation
+
+Install Requirements and copy the shell script `fzmail.sh` somewhere and make
+it executable.
 
 ## Status
 
 THIS IS EARLY ALPHA!!!
 BREAKING CHANGES ARE LIKELY TO HAPPEND!!!
+DONT USE IT ON ANY REAL EMAILS!!!
 
 ## Requirements
 
@@ -21,26 +26,19 @@ BREAKING CHANGES ARE LIKELY TO HAPPEND!!!
 - [msmtp (send mail alternative)](https://marlam.de/msmtp/)
 - [mblaze (handling mail in maildir format)](https://github.com/leahneukirchen/mblaze)
 - general gnu tools
+- nvim (default editor, can be easly changed in the script on top of the file)
 
 
-### Files
+### mail-profiles
 
-#### mail-profiles
+For example see [mail-profiles-example](https://github.com/braunbearded/fzmail/blob/main/mail-profiles-example)
+Default location in `$HOME/mail-profiles`.
 
-Pipe seperated mail profiles. One line per profile. Located in `$HOME/.config/mail-profiles`.
+## Semi requirements
 
-```
-mail@domain.tld|My Name <mail@domain.tld>|AbsolutePathToDraftFolder|AbsolutePathToSendFolder
-```
-
-#### MAILDIR
-
-Enviorment Variable containing path to top maildir which you want to work with
-fzmail.
-
-## Optional
-
-Get your mails in maildir format via [isync](https://isync.sourceforge.io/).
+fzmail operates only on mails in maildir format, so you need some way to download
+your mails in this format.
+I use [isync](https://isync.sourceforge.io/).
 
 ## Licence
 MIT
