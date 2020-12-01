@@ -10,6 +10,6 @@ render_folder_content_short() {
     if [ "$(echo "$flags" | grep -o "S")" = "" ]; then
         flags="${flags}U"
     fi
-    # printf "%-6s|%-3s|%-25s|%-6s|%-6s|%-8s|%s|%-20s|%-20s\n" "$flags" "$date" "$subject" "$from" >> "$tmpcontent"
+
     printf "Flags: %-5s     Subject: %s\nDate: %s From: %s\n%s\n"  "$flags" "$subject" "$date" "$from" "$fzf_pre_folder_header"
 }
