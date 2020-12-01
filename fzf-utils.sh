@@ -1,5 +1,8 @@
 #!/bin/sh
 
+. ./profile-utils.sh
+. ./render-utils.sh
+
 nl="
 "
 
@@ -32,4 +35,32 @@ fzf_add_list() {
         options="$(echo "$multiline_list" | sort | uniq -u)"
     done
     echo "${list%??}"
+}
+
+fzf_preview_folder() {
+    #$1 = profile path
+    #$2 = current entry
+    #$3 = tree
+    element_type="$(echo "$2" | awk -F "|" '{print $4}')"
+    profile_id="$(echo "$2" | awk -F "|" '{print $2}')"
+
+    # mail
+    if [ "${#element_type}" = 6 ]; then
+        # mail_id="$(echo "$2" | awk -F "|" '{print $5}')"
+        # folder="$(echo "$3" | grep -E "^$folder_id" | awk -F "|" '{print $4}' | xargs)"
+        # mail_path="$(get_mails_by_profile "$1" "$profile_id" "$folder" | sed "$mail_id!d")"
+        # mshow -N -n "$mail_path"
+        echo "Mail dummy"
+    fi
+
+    # folder
+    if [ "${#element_type}" = 22 ]; then
+        folder="$(echo "$element_type" | xargs)"
+        get_mails_by_profile "$1" "$profile_id" "$folder" | \
+            # version 1
+            #xargs -I "{}" sh -c "mshow -N -n '{}' | head -n 10 && echo "$fzf_pre_folder_header" "
+
+            # version 2
+            xargs -I "{}" sh -c ". ./render-utils.sh && render_folder_content_short '{}'"
+    fi
 }

@@ -13,7 +13,9 @@ while true; do
         render=false
     fi
 
-    selected_entry="$(echo "$tree" | fzf --tac --header "$fzf_header" | tr -d "\n")"
+    selected_entry="$(echo "$tree" | fzf --tac --header "$fzf_header" \
+        --preview ". ./fzf-utils.sh && fzf_preview_folder $profiles {}" \
+        --preview-window "right:33%" | tr -d "\n")"
     [ "$selected_entry" = "" ] && exit
 
     selected_type="$(echo "$selected_entry" | awk -F "|" '{print $4}')"
@@ -34,7 +36,8 @@ while true; do
     # mail selected
     if [ "${#selected_type}" = 6 ]; then
         flags="$(echo "$selected_entry" | awk -F "|" '{print $6}')"
-        selected_mail_operation="$(filter_operations "$mail_operations" "$flags" "=" | fzf --prompt "What to do with selected mail(s)? ")"
+        selected_mail_operation="$(filter_operations "$mail_operations" "$flags" "=" | \
+            fzf --prompt "What to do with selected mail(s)? ")"
         [ "$selected_mail_operation" = "" ] || [ "$selected_mail_operation" = "exit" ] && continue
 
         folder_id="$(echo "$selected_entry" | awk -F "|" '{print $4}')"
@@ -69,5 +72,6 @@ while true; do
     if [ "${#selected_type}" = 22 ]; then
         folder="$(echo "$selected_entry" | awk -F "|" '{print $4}' | xargs)"
         mails_folder="$(get_mails_by_profile "$profiles" "$selected_profile_id" "$folder")"
+        render=true
     fi
 done
