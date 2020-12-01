@@ -22,3 +22,4 @@ edit=T
 exit"
 
 fzf_header="row   |id |profile                  |folder;flags|date     |mails;subject       |from"
+fzf_pre_folder_header="--------------------------------------------------------"
