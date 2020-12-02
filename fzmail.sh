@@ -5,11 +5,12 @@
 . ./profile-utils.sh
 . ./maildir-utils.sh
 . ./fzf-utils.sh
+. ./render-utils.sh
 
 render=true
 while true; do
     if [ "$render" = true ]; then
-        tree="$(./render-tree.sh "$selected_entry" "$mails_folder")"
+        tree="$(render_tree "$profiles" "$selected_profile_id" "$folder")"
         render=false
     fi
 

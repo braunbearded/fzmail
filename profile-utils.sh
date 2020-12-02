@@ -19,3 +19,9 @@ get_path_by_profile() {
     #$2 = profile id
     sed "$2!d" "$1" | awk -F "|" '{print $4}'
 }
+
+get_name_by_profile() {
+    #$1 = path to config
+    #$2 = profile id
+    sed "$2!d" "$1" | awk -F "|" '{print $2}'
+}
