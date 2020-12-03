@@ -10,8 +10,9 @@ filter_operations() {
     #$1 = input to choose from
     #$2 = filter flags
     #$3 = delimiter
-    flags_regex="$(echo "$2" | awk '{print $1}' | grep -o . | awk '{output = $1 "|" output} END {print "(" substr(output, 1, length(output)-1) ")"}')"
-    echo "$1" | grep -v "$flags_regex" | cut -d "$3" -f 1
+    flags_regex="$(echo "$2" | awk '{print $1}' | grep -o . | \
+        awk '{output = $1 "|" output} END {print "(" substr(output, 1, length(output)-1) ")"}')"
+    echo "$1" | grep -vE "$flags_regex" | cut -d "$3" -f 1
 }
 
 fzf_add_list() {
