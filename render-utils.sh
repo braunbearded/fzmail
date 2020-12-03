@@ -55,7 +55,7 @@ render_tree() {
                     i = 1;
                     printf "%s\n%-6s|%-3s|%s\n%s\n", "-header-dummy-","ROW_PL", id, name, "-header-dummy-"
                 } {
-                    folder=substr(gensub(parent_folder, "", "g"),0,22);
+                    folder=substr(gensub(parent_folder "/", "", "g"),0,22);
                     split(mail_count, m_count, ",");
                     printf "%-6s|%-3s|%-25s|%-22s|%s\n", "ROW_PL", id, name, folder, m_count[i++]
                 }
