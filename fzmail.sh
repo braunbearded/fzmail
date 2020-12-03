@@ -57,9 +57,21 @@ while true; do
 
         [ "$selected_mail_operation" = "mark as unread" ] && render=true && remove_flag_mail "$(move_mail_to_cur "$mail_path")" "S" > /dev/null
 
-        [ "$selected_mail_operation" = "move to folder" ] && echo "TODO"
+        if [ "$selected_mail_operation" = "move to folder" ]; then
+            target_folder="$(get_mail_folders "$profile_path" | \
+                awk -v profile_path="$profile_path" '{gsub(profile_path "/",""); print}' | \
+                fzf --prompt "Select folder to move mail to: ")"
+            [ "$target_folder" = "" ] && continue
+            render=true
+            move_mail_to_folder "$mail_path" "$target_folder" "$profile_path" > /dev/null
+        fi
 
-        [ "$selected_mail_operation" = "move to trash" ] && echo "TODO"
+        if [ "$selected_mail_operation" = "move to trash" ]; then
+            render=true
+            trash_path="$(get_trash_by_profile "$profiles" "$selected_profile_id")"
+            new_path="$(move_mail_to_folder "$mail_path" "$trash_path" "$profile_path")"
+            set_flag_mail "$new_path" "T" > /dev/null
+        fi
 
         [ "$selected_mail_operation" = "reply" ] && echo "TODO"
 

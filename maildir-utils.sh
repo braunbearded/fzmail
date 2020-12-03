@@ -37,3 +37,18 @@ move_mail_to_cur() {
     [ "$1" != "$new_path" ] && mv "$1" "$new_path"
     echo "$new_path"
 }
+
+get_mail_folders() {
+    #$1 = folder to maildir top folder
+    mdirs -a "$1"
+}
+
+move_mail_to_folder() {
+    #$1 = path to mail
+    #$2 = folder
+    #$3 = folder to maildir top folder
+    file_name="$(basename "$1")"
+    new_path="$3/$2/new/$file_name"
+    mv "$1" "$new_path"
+    move_mail_to_cur "$new_path"
+}
