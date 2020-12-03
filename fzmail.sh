@@ -53,9 +53,9 @@ while true; do
 
         [ "$selected_mail_operation" = "delete" ] && rm "$mail_path" && render=true
 
-        [ "$selected_mail_operation" = "mark as read" ] && echo "TODO"
+        [ "$selected_mail_operation" = "mark as read" ] && render=true && set_flag_mail "$(move_mail_to_cur "$mail_path")" "S" > /dev/null
 
-        [ "$selected_mail_operation" = "mark as unread" ] && echo "TODO"
+        [ "$selected_mail_operation" = "mark as unread" ] && render=true && remove_flag_mail "$(move_mail_to_cur "$mail_path")" "S" > /dev/null
 
         [ "$selected_mail_operation" = "move to folder" ] && echo "TODO"
 
