@@ -6,6 +6,7 @@
 . ./maildir-utils.sh
 . ./fzf-utils.sh
 . ./render-utils.sh
+. ./general-utils.sh
 
 render=true
 current_folder=''
@@ -38,7 +39,9 @@ while true; do
     # mail selected
     if [ "${#selected_type}" = 6 ]; then
         flags="$(echo "$selected_entry" | awk -F "|" '{print $6}')"
-        selected_mail_operation="$(filter_operations "$mail_operations" "$flags" "=" | \
+        [ "$(echo "$flags" | grep -o "D")" = "" ] && flags="A${flags}"
+        converted_flags="$(convert_flags "$flags")"
+        selected_mail_operation="$(filter_operations "$mail_operations" "$converted_flags" "=" | \
             fzf --prompt "What to do with selected mail(s)? ")"
         [ "$selected_mail_operation" = "" ] || [ "$selected_mail_operation" = "exit" ] && continue
 
