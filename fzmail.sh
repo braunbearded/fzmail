@@ -8,6 +8,7 @@
 . ./render-utils.sh
 
 render=true
+current_folder=''
 while true; do
     if [ "$render" = true ]; then
         tree="$(render_tree "$profiles" "$selected_profile_id" "$folder")"
@@ -69,10 +70,16 @@ while true; do
         [ "$selected_mail_operation" = "edit" ] && echo "TODO"
     fi
 
-    # folder selected
+    # folder selecte
     if [ "${#selected_type}" = 22 ]; then
-        folder="$(echo "$selected_entry" | awk -F "|" '{print $4}' | xargs)"
-        mails_folder="$(get_mails_by_profile "$profiles" "$selected_profile_id" "$folder")"
+        if [ "$selected_entry" = "$current_folder" ]; then
+            current_folder=''
+            unset folder
+        else
+            current_folder=$selected_entry
+            folder="$(echo "$selected_entry" | awk -F "|" '{print $4}' | xargs)"
+            mails_folder="$(get_mails_by_profile "$profiles" "$selected_profile_id" "$folder")"
+        fi
         render=true
     fi
 done
