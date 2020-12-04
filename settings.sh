@@ -15,7 +15,7 @@ mark as unread=2
 reply=34
 move to trash=4
 move to folder=3
-download attachment(s)
+download attachment(s)=9
 forward=3
 delete=4
 edit

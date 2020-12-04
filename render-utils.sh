@@ -29,8 +29,10 @@ render_folder_content() {
         date="$(date -d "$(mshow -n -q -h date "__" |
             grep -oE "[0-9]+ [A-Z][a-z][a-z] [0-9][0-9][0-9][0-9] [0-9][0-9]:[0-9][0-9]")" +"%Y-%m-%d %H:%M")";
         from="$(mshow -n -q -h from "__" | cut -c 7-)";
+        attachment="$(grep -o "Content-Disposition: attachment; filename=" "__")"
         flags="$(echo "__" | grep -oE "2,.*" | cut -c 3-)";
         [ "$(echo "$flags" | grep -o "S")" = "" ] && flags="${flags}U";
+        [ "$attachment" != "" ] && flags="${flags}A";
         printf "%s|%s|%s|%s\n" "$flags" "$date" "$subject" "$from"' | \
             awk -F "|" 'BEGIN {i = 1} {printf "%-6s|%-3s|%s|%s|%-6s|%-8s|%s|%-20s|%-20s\n",
                     "ROW_PL", "PPL", "PROFILE_NAME_PL", "FOIDPL", i++, $1, $2, $3, $4}'

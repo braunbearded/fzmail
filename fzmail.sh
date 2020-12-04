@@ -44,7 +44,8 @@ while true; do
     # mail selected
     if [ "${#selected_type}" = 6 ]; then
         flags="$(echo "$selected_entry" | awk -F "|" '{print $6}')"
-        [ "$(echo "$flags" | grep -o "D")" = "" ] && flags="A${flags}"
+        [ "$(echo "$flags" | grep -o "D")" = "" ] && flags="Z${flags}"
+        [ "$(echo "$flags" | grep -o "A")" = "" ] && flags="Y${flags}"
         converted_flags="$(convert_flags "$flags")"
         selected_mail_operation="$(filter_operations "$mail_operations" "$converted_flags" "=" | \
             fzf --prompt "What to do with selected mail(s)? ")"
@@ -85,7 +86,14 @@ while true; do
 
         [ "$selected_mail_operation" = "forward" ] && echo "TODO"
 
-        [ "$selected_mail_operation" = "download attachment(s)" ] && echo "TODO"
+        if [ "$selected_mail_operation" = "download attachment(s)" ]; then
+            file_name="$(tr -d "\n" < "$mail_path" | grep -oE "Content-Disposition: attachment; filename=\".*\"" | cut -d "\"" -f 2)"
+            attachment_folder="$(get_attachment_by_profile "$profiles" "$selected_profile_id")"
+            [ ! -d "$attachment_folder" ] && mkdir -p "$attachment_folder"
+            full_file_name="$attachment_folder/$file_name"
+            [ -f "$full_file_name" ] && full_file_name="$full_file_name$(date +%s)"
+            tr -d "\n" < "$mail_path" | grep -oE "[a-zA-Z0-9]*==" | base64 -d > "$full_file_name"
+        fi
 
         if [ "$selected_mail_operation" = "edit" ]; then
             "$edit_mail" -c "setfiletype mail" "$mail_path"
