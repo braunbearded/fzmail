@@ -61,7 +61,7 @@ render_tree() {
                     split(mail_count, m_count, ",");
                     printf "%-6s|%-3s|%-25s|%-22s|%s\n", "ROW_PL", id, name, folder, m_count[i++]
                 }
-                END {printf "%-6s|%-3s|%-25s|%s\n", "ROW_PL", id, name, "<New Mail>"}'\'' ' < "$1")"
+                END {printf "%-6s|%-3s|%-25s|%s\n%-6s|%-3s|%-25s|%s\n", "ROW_PL", id, name, "<New Mail>", "ROW_PL", id, name, "<Attachment(s)>"}'\'' ' < "$1")"
 
     if [ "$2" != "" ]; then
         profile_name="$(get_name_by_profile "$1" "$2")"

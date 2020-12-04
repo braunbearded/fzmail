@@ -41,6 +41,15 @@ while true; do
         [ "$confirm_sync" = "Yes" ] && mbsync -c "$mbsync_config" -a
     fi
 
+    if [ "$selected_type" = "<Attachment(s)>" ]; then
+        attachment_folder="$(get_attachment_by_profile "$profiles" "$selected_profile_id")"
+        selected_file="$(find "$attachment_folder" -type f | fzf --prompt "Select attachment: ")"
+        [ "$selected_file" = "" ] && continue
+        operation="$(echo "$attachment_operations" | fzf --prompt "Select operation for \"$selected_file\": ")"
+        [ "$operation" = "remove" ] && rm "$selected_file"
+        [ "$operation" = "open" ] && xdg-open "$selected_file"
+    fi
+
     # mail selected
     if [ "${#selected_type}" = 6 ]; then
         flags="$(echo "$selected_entry" | awk -F "|" '{print $6}')"
