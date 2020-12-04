@@ -25,5 +25,5 @@ if [ "$op" = "new" ] && [ -d "$draft_path" ]; then
     message_id="$(mgenmid)"
     printf "To: %s\nCc: %s\nBcc: %s\nFrom: %s\nMessage-Id: %s\nSubject: %s\n%s\n\n%s" \
         "$to" "$cc" "$bcc" "$from" "$message_id" "$subject" "$other_header" "$content" | \
-        mdeliver -v -c -XD "$draft_path"
+        mdeliver -v -c -X"$flag" "$draft_path"
 fi

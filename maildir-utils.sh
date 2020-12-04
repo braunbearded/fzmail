@@ -2,8 +2,12 @@
 
 get_recipients() {
     #$1 = path to maildir
-    awk -F "|" '{print $4}' "$1" | xargs -I "{}" sh -c "find {} -type f ! -name '.*'" | \
-        maddr | sort -u
+    #Optional
+    #$2 = path to mail addresses
+    addresses="$(awk -F "|" '{print $4}' "$1" | xargs -I "{}" sh -c "find {} -type f ! -name '.*'" | \
+        maddr | sort -u)"
+        [ "$2" != "" ] && addresses="$(printf "%s\n%s" "$addresses" "$(cat "$2")")"
+    echo "$addresses" | sort -u
 }
 
 set_flag_mail() {

@@ -1,10 +1,10 @@
 #!/bin/sh
 
-profiles="$HOME/mail-profiles"
+profiles="$HOME/.config/fzmail/mail-profiles"
 
-recipients_path=""
+mail_addresses_path="$HOME/.config/fzmail/mail-addresses"
 
-editor="nvim"
+edit_mail="nvim"
 
 flag_delimiter=","
 
@@ -24,3 +24,5 @@ exit"
 fzf_header="row   |id |profile                  |folder;flags|date     |mails;subject       |from"
 
 fzf_pre_folder_header="--------------------------------------------------------"
+
+mbsync_config="$HOME/.config/isyncrc"

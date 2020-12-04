@@ -31,3 +31,9 @@ get_trash_by_profile() {
     #$2 = profile id
     sed "$2!d" "$1" | awk -F "|" '{print $5}'
 }
+
+get_draft_by_profile() {
+    #$1 = path to config
+    #$2 = profile id
+    sed "$2!d" "$1" | awk -F "|" '{print $6}'
+}
