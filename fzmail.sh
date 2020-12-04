@@ -93,7 +93,19 @@ while true; do
 
         [ "$selected_mail_operation" = "reply" ] && echo "TODO"
 
-        [ "$selected_mail_operation" = "forward" ] && echo "TODO"
+        if [ "$selected_mail_operation" = "forward" ]; then
+            from="$(get_sender_by_profile "$profiles" "$selected_profile_id")"
+            to="$(fzf_add_list "$(get_recipients "$profiles" "$mail_addresses_path")" "Forward to: ")"
+            cc="$(fzf_add_list "$(get_recipients "$profiles" "$mail_addresses_path")" "Forward cc: ")"
+            bcc="$(fzf_add_list "$(get_recipients "$profiles" "$mail_addresses_path")" "Forward bcc: ")"
+            draft_path="$profile_path/$(get_draft_by_profile "$profiles" "$selected_profile_id")"
+            draft="$(./generate-mail.sh "forward" "$draft_path" "$mail_path" -f "$from" -t "$to" -c "$cc" -b "$bcc" -l "D")"
+            "$edit_mail" -c "setfiletype mail" "$draft"
+            confirm_send="$(printf "Yes\nNo" | fzf --prompt "Send this draft? ")"
+            [ "$confirm_send" = "Yes" ] && msmtp --read-envelope-from -t < "$draft" && rm "$draft"
+            confirm_sync="$(printf "Yes\nNo" | fzf --prompt "Sync imap? ")"
+            [ "$confirm_sync" = "Yes" ] && mbsync -c "$mbsync_config" -a
+        fi
 
         if [ "$selected_mail_operation" = "download attachment(s)" ]; then
             file_names="$(grep -oE "Content-Disposition: attachment; filename=\".*\"" < "$mail_path" | cut -d "\"" -f 2)"
@@ -116,6 +128,7 @@ while true; do
                 [ "$confirm_send" = "Yes" ] && msmtp --read-envelope-from -t < "$draft" && rm "$draft"
                 confirm_sync="$(printf "Yes\nNo" | fzf --prompt "Sync imap? ")"
                 [ "$confirm_sync" = "Yes" ] && mbsync -c "$mbsync_config" -a
+                render=true
             fi
         fi
     fi
