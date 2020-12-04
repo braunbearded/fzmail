@@ -87,7 +87,15 @@ while true; do
 
         [ "$selected_mail_operation" = "download attachment(s)" ] && echo "TODO"
 
-        [ "$selected_mail_operation" = "edit" ] && echo "TODO"
+        if [ "$selected_mail_operation" = "edit" ]; then
+            "$edit_mail" -c "setfiletype mail" "$mail_path"
+            if [ "$(echo "$flags" | grep -o "D")" != "" ]; then
+                confirm_send="$(printf "Yes\nNo" | fzf --prompt "Send this draft? ")"
+                [ "$confirm_send" = "Yes" ] && msmtp --read-envelope-from -t < "$draft" && rm "$draft"
+                confirm_sync="$(printf "Yes\nNo" | fzf --prompt "Sync imap? ")"
+                [ "$confirm_sync" = "Yes" ] && mbsync -c "$mbsync_config" -a
+            fi
+        fi
     fi
 
     # folder selecte
