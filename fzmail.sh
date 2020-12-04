@@ -96,12 +96,17 @@ while true; do
         [ "$selected_mail_operation" = "forward" ] && echo "TODO"
 
         if [ "$selected_mail_operation" = "download attachment(s)" ]; then
-            file_name="$(tr -d "\n" < "$mail_path" | grep -oE "Content-Disposition: attachment; filename=\".*\"" | cut -d "\"" -f 2)"
+            file_names="$(grep -oE "Content-Disposition: attachment; filename=\".*\"" < "$mail_path" | cut -d "\"" -f 2)"
             attachment_folder="$(get_attachment_by_profile "$profiles" "$selected_profile_id")"
             [ ! -d "$attachment_folder" ] && mkdir -p "$attachment_folder"
-            full_file_name="$attachment_folder/$file_name"
-            [ -f "$full_file_name" ] && full_file_name="$full_file_name$(date +%s)"
-            tr -d "\n" < "$mail_path" | grep -oE "[a-zA-Z0-9]*==" | base64 -d > "$full_file_name"
+            i=1
+            for file_name in $file_names; do
+                full_file_name="$attachment_folder/$file_name"
+                [ -f "$full_file_name" ] && full_file_name="$full_file_name$(date +%s)"
+                tr -d "\n" < "$mail_path" | grep -oE "[a-zA-Z0-9\+/]*=[-=]" | \
+                    tr -d "-" | sed -n "${i}p" | base64 -d > "$full_file_name"
+                i="$((i+1))"
+            done
         fi
 
         if [ "$selected_mail_operation" = "edit" ]; then
