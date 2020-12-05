@@ -52,13 +52,14 @@ if [ "$op" = "forward" ] && [ -d "$draft_path" ]; then
     orig_to="$(echo "$original" | mshow -q -h to | cut -c 5-)"
     orig_cc="$(echo "$original" | mshow -q -h cc | cut -c 5-)"
     orig_bcc="$(echo "$original" | mshow -q -h bcc | cut -c 6-)"
+    orig_message_id="$(echo "$original" | mshow -q -h message-id | cut -c 13-)"
+    orig_reference_id="$orig_message_id $(echo "$original" | mshow -q -h references | cut -c 13-)"
 
     subject="Fwd: $orig_subject"
     header_end="$(grep -n "Content-Type" "$original" | cut -d ":" -f 1 | head -n 1)"
-    orig_message_id="$(echo "$original" | mshow -q -h message-id | cut -c 13-)"
     message_id="$(mgenmid)"
     other_header="$(printf "%sReferences: %s\nIn-Reply-To: %s\n" "$other_header" \
-        "$orig_message_id" "$orig_message_id")"
+        "$orig_reference_id" "$orig_message_id")"
     forward_path="$(printf "To: %s\nCc: %s\nBcc: %s\nFrom: %s\nMessage-Id: %s\nSubject: %s\n%s\n" \
         "$to" "$cc" "$bcc" "$from" "$message_id" "$subject" "$other_header" | \
         mdeliver -v -c -X"$flag" "$draft_path")"
