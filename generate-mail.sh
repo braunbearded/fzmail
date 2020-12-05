@@ -22,8 +22,9 @@ if [ "$op" = "new" ] && [ -d "$draft_path" ]; then
         shift
     done
 
+    content="# content below this line (dont delete this line)"
     message_id="$(mgenmid)"
-    printf "To: %s\nCc: %s\nBcc: %s\nFrom: %s\nMessage-Id: %s\nSubject: %s\n%s\n\n%s" \
+    printf "To: %s\nCc: %s\nBcc: %s\nFrom: %s\nMessage-Id: %s\nAttachments:\nSubject: %s\n%s\n%s\n\n" \
         "$to" "$cc" "$bcc" "$from" "$message_id" "$subject" "$other_header" "$content" | \
         mdeliver -v -c -X"$flag" "$draft_path"
 fi

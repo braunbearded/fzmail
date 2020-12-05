@@ -36,7 +36,11 @@ while true; do
         draft="$(./generate-mail.sh "new" "$draft_path" -f "$from" -t "$to" -c "$cc" -b "$bcc" -l "D")"
         "$edit_mail" -c "setfiletype mail" "$draft"
         confirm_send="$(printf "Yes\nNo" | fzf --prompt "Send this draft? ")"
-        [ "$confirm_send" = "Yes" ] && msmtp --read-envelope-from -t < "$draft" && rm "$draft"
+        if [ "$confirm_send" = "Yes" ]; then
+            tmp_file="$draft$(date +%s)"
+            cp "$draft" "$tmp_file" && ./convert-mail.sh "$tmp_file" > "$draft" \
+                && rm "$tmp_file" && msmtp --read-envelope-from -t < "$draft" && rm "$draft"
+        fi
         confirm_sync="$(printf "Yes\nNo" | fzf --prompt "Sync imap? ")"
         [ "$confirm_sync" = "Yes" ] && mbsync -c "$mbsync_config" -a
     fi

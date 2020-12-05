@@ -15,3 +15,7 @@ convert_flags() {
     echo "$1" | tr "S" "1" | tr "U" "2" | tr "D" "3" | tr "T" "4" | \
         tr "P" "5" | tr "R" "6" | tr "F" "7" | tr "Z" "8" | tr "Y" "9"
 }
+
+boundary_generator() {
+    head /dev/urandom | tr -dc a-z0-9 | head -c 25
+}
