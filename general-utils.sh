@@ -19,3 +19,7 @@ convert_flags() {
 boundary_generator() {
     head /dev/urandom | tr -dc a-z0-9 | head -c 25
 }
+
+remove_empty_lines() {
+    sed "/^[[:space:]]*$/d"
+}

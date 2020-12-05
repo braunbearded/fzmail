@@ -2,6 +2,7 @@
 
 . ./profile-utils.sh
 . ./render-utils.sh
+. ./general-utils.sh
 
 nl="
 "
@@ -19,7 +20,7 @@ fzf_add_list() {
     #$1 = input to choose from
     #$2 = prompt
     #$3 = preselected values, if any
-    data="$(printf "%s\nexit" "$1")"
+    data="$(printf "%s\nexit" "$1" | remove_empty_lines)"
     if [ "$3" != "" ]; then
         list="$3, "
         multiline_list="$(echo "$list" | sed "s/,/\n/g" | awk '{$1=$1;print}')$nl$data"
@@ -29,11 +30,12 @@ fzf_add_list() {
     fi
 
     while [ "$options" != "exit" ]; do
+        options="$(echo "$options" | remove_empty_lines)"
         selected="$(echo "$options" | fzf --prompt "$2(${list%??})")"
         [ "$selected" = "exit" ] || [ "$selected" = "" ] && { options="exit"; continue; }
         list="$selected, $list"
         multiline_list="$(echo "$list" | sed "s/,/\n/g" | awk '{$1=$1;print}')$nl$data"
-        options="$(echo "$multiline_list" | sort | uniq -u)"
+        options="$(echo "$multiline_list" | sort | uniq -u | remove_empty_lines)"
     done
     echo "${list%??}"
 }
