@@ -38,7 +38,7 @@ while true; do
         confirm_send="$(printf "Yes\nNo" | fzf --prompt "Send this draft? ")"
         if [ "$confirm_send" = "Yes" ]; then
             tmp_file="$draft$(date +%s)"
-            cp "$draft" "$tmp_file" && ./convert-mail.sh "$tmp_file" > "$draft" \
+            cp "$draft" "$tmp_file" && ./convert-mail.sh "new" "$tmp_file" > "$draft" \
                 && rm "$tmp_file" && msmtp --read-envelope-from -t < "$draft" && rm "$draft"
         fi
         confirm_sync="$(printf "Yes\nNo" | fzf --prompt "Sync imap? ")"
@@ -95,7 +95,29 @@ while true; do
             set_flag_mail "$new_path" "T" > /dev/null
         fi
 
-        [ "$selected_mail_operation" = "reply" ] && echo "TODO"
+        if [ "$selected_mail_operation" = "reply" ]; then
+            orig_from="$(echo "$mail_path" | mshow -q -h from | cut -c 7-)"
+            orig_to="$(echo "$mail_path" | mshow -q -h to | cut -c 5-)"
+            orig_cc="$(echo "$mail_path" | mshow -q -h cc | cut -c 5-)"
+            orig_bcc="$(echo "$mail_path" | mshow -q -h bcc | cut -c 6-)"
+            orig_from_header="$(echo "Old-From: $orig_from")"
+
+            from="$(get_sender_by_profile "$profiles" "$selected_profile_id")"
+            to="$(fzf_add_list "$(get_recipients "$profiles" "$mail_addresses_path")" "Reply to: " "$orig_from")"
+            cc="$(fzf_add_list "$(get_recipients "$profiles" "$mail_addresses_path")" "Reply cc: " "$orig_cc")"
+            bcc="$(fzf_add_list "$(get_recipients "$profiles" "$mail_addresses_path")" "Reply bcc: " "$orig_bcc")"
+            draft_path="$profile_path/$(get_draft_by_profile "$profiles" "$selected_profile_id")"
+            draft="$(./generate-mail.sh "reply" "$draft_path" "$mail_path" -f "$from" -t "$to" -c "$cc" -b "$bcc" -l "D" -h "$orig_from_header")"
+            "$edit_mail" -c "setfiletype mail" "$draft"
+            confirm_send="$(printf "Yes\nNo" | fzf --prompt "Send this draft? ")"
+            if [ "$confirm_send" = "Yes" ]; then
+                tmp_file="$draft$(date +%s)"
+                cp "$draft" "$tmp_file" && ./convert-mail.sh "reply" "$tmp_file" > "$draft" \
+                    && rm "$tmp_file" && msmtp --read-envelope-from -t < "$draft" && rm "$draft"
+            fi
+            confirm_sync="$(printf "Yes\nNo" | fzf --prompt "Sync imap? ")"
+            [ "$confirm_sync" = "Yes" ] && mbsync -c "$mbsync_config" -a
+        fi
 
         if [ "$selected_mail_operation" = "forward" ]; then
             from="$(get_sender_by_profile "$profiles" "$selected_profile_id")"
@@ -105,6 +127,7 @@ while true; do
             draft_path="$profile_path/$(get_draft_by_profile "$profiles" "$selected_profile_id")"
             draft="$(./generate-mail.sh "forward" "$draft_path" "$mail_path" -f "$from" -t "$to" -c "$cc" -b "$bcc" -l "D")"
             "$edit_mail" -c "setfiletype mail" "$draft"
+            # TODO
             confirm_send="$(printf "Yes\nNo" | fzf --prompt "Send this draft? ")"
             [ "$confirm_send" = "Yes" ] && msmtp --read-envelope-from -t < "$draft" && rm "$draft"
             confirm_sync="$(printf "Yes\nNo" | fzf --prompt "Sync imap? ")"
@@ -125,6 +148,7 @@ while true; do
             done
         fi
 
+        #TODO
         if [ "$selected_mail_operation" = "edit" ]; then
             "$edit_mail" -c "setfiletype mail" "$mail_path"
             if [ "$(echo "$flags" | grep -o "D")" != "" ]; then
