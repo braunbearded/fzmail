@@ -24,9 +24,11 @@ if [ "$op" = "new" ] && [ -d "$draft_path" ]; then
 
     content="# content below this line (dont delete this line)"
     message_id="$(mgenmid)"
-    printf "To: %s\nCc: %s\nBcc: %s\nFrom: %s\nMessage-Id: %s\nAttachments:\nSubject: %s\n%s\n%s\n\n" \
+    new_path="$(printf "To: %s\nCc: %s\nBcc: %s\nFrom: %s\nMessage-Id: %s\nAttachments:\nSubject: %s\n%s\n%s\n\n" \
         "$to" "$cc" "$bcc" "$from" "$message_id" "$subject" "$other_header" "$content" | \
-        mdeliver -v -c -X"$flag" "$draft_path"
+        mdeliver -v -c -X"$flag" "$draft_path")"
+    new_path_type="$(dirname "$new_path")"/new-"$(basename "$new_path")"
+    mv "$new_path" "$new_path_type" && echo "$new_path_type"
 fi
 
 if [ "$op" = "forward" ] && [ -d "$draft_path" ]; then
@@ -63,16 +65,18 @@ if [ "$op" = "forward" ] && [ -d "$draft_path" ]; then
     forward_path="$(printf "To: %s\nCc: %s\nBcc: %s\nFrom: %s\nMessage-Id: %s\nSubject: %s\n%s\n" \
         "$to" "$cc" "$bcc" "$from" "$message_id" "$subject" "$other_header" | \
         mdeliver -v -c -X"$flag" "$draft_path")"
+    forward_path_type="$(dirname "$forward_path")"/forward-"$(basename "$forward_path")"
+    mv "$forward_path" "$forward_path_type"
     if [ "$header_end" != "" ]; then
-        tail -n +"$header_end" "$original" >> "$forward_path"
+        tail -n +"$header_end" "$original" >> "$forward_path_type"
     else
         printf "%s\nFrom: %s\nDate: %s\nSubject: %s\nTo: %s\nCc: %s\nBcc: %s\n\n" \
             "$forward_old_header" "$orig_from" "$orig_date" "$orig_subject" \
-            "$orig_to" "$orig_cc" "$orig_bcc" >> "$forward_path"
-        echo "$original" | mshow -r >> "$forward_path"
+            "$orig_to" "$orig_cc" "$orig_bcc" >> "$forward_path_type"
+        echo "$original" | mshow -r >> "$forward_path_type"
     fi
 
-    echo "$forward_path"
+    echo "$forward_path_type"
 fi
 
 if [ "$op" = "reply" ] && [ -d "$draft_path" ]; then
@@ -107,9 +111,11 @@ if [ "$op" = "reply" ] && [ -d "$draft_path" ]; then
     reply_path="$(printf "To: %s\nCc: %s\nBcc: %s\nFrom: %s\nMessage-Id: %s\nSubject: %s\n%s\n" \
         "$to" "$cc" "$bcc" "$from" "$message_id" "$subject" "$other_header" | \
         mdeliver -v -c -X"$flag" "$draft_path")"
+    reply_path_type="$(dirname "$reply_path")"/reply-"$(basename "$reply_path")"
+    mv "$reply_path" "$reply_path_type"
 
-    printf "\n%s\n\n%s\n" "$content_delimiter_start" "$content_delimiter_end" >> "$reply_path"
-    tail -n +"$header_end" "$original" >> "$reply_path"
+    printf "\n%s\n\n%s\n" "$content_delimiter_start" "$content_delimiter_end" >> "$reply_path_type"
+    tail -n +"$header_end" "$original" >> "$reply_path_type"
 
-    echo "$reply_path"
+    echo "$reply_path_type"
 fi

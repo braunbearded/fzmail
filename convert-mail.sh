@@ -47,7 +47,7 @@ if [ "$1" = "reply" ]; then
     headers="$(head -n "$((start_new_content - 1))" "$2" | sed '/^[[:space:]]*$/d' | grep -vE "(Attachments:|Old-From:|Date:)")"
     content_type_main="$(grep "Content-Type:" "$2" | head -n 1)"
     new_content_text="$(sed -n "$((start_new_content + 1)),$((end_new_content - 1))"p "$2")"
-    new_content_html="$(printf "<div>\n%s\n</div>\n\n" "$(sed -n "$((start_new_content + 1)),$((end_new_content - 1))"p "$2" | sed ':a;N;$!ba;s/\n/<br\/>\n/g')")"
+    new_content_html="$(printf "<div>\n%s</br>\n</div>\n\n" "$(sed -n "$((start_new_content + 1)),$((end_new_content - 1))"p "$2" | sed ':a;N;$!ba;s/\n/<br\/>\n/g')")"
     start_old_content="$(grep "$content_delimiter_end" -n "$2" | cut -d ":" -f 1)"
 
     old_from="$(grep "Old-From: " "$2" | cut -c 10-)"

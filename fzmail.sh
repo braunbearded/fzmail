@@ -37,9 +37,10 @@ while true; do
         "$edit_mail" -c "setfiletype mail" "$draft"
         confirm_send="$(printf "Yes\nNo" | fzf --prompt "Send this draft? ")"
         if [ "$confirm_send" = "Yes" ]; then
-            tmp_file="$draft$(date +%s)"
-            cp "$draft" "$tmp_file" && ./convert-mail.sh "new" "$tmp_file" > "$draft" \
-                && rm "$tmp_file" && msmtp --read-envelope-from -t < "$draft" && rm "$draft"
+            tmp_file="$draft$(date +%s)" && \
+                 cp "$draft" "$tmp_file" && \
+                 ./convert-mail.sh "new" "$tmp_file" > "$draft" && \
+                 rm "$tmp_file" && msmtp --read-envelope-from -t < "$draft" && rm "$draft"
         fi
         confirm_sync="$(printf "Yes\nNo" | fzf --prompt "Sync imap? ")"
         [ "$confirm_sync" = "Yes" ] && mbsync -c "$mbsync_config" -a
@@ -111,9 +112,11 @@ while true; do
             "$edit_mail" -c "setfiletype mail" "$draft"
             confirm_send="$(printf "Yes\nNo" | fzf --prompt "Send this draft? ")"
             if [ "$confirm_send" = "Yes" ]; then
-                tmp_file="$draft$(date +%s)"
-                cp "$draft" "$tmp_file" && ./convert-mail.sh "reply" "$tmp_file" > "$draft" \
-                    && rm "$tmp_file" && msmtp --read-envelope-from -t < "$draft" && rm "$draft"
+                tmp_file="$draft$(date +%s)" && \
+                    cp "$draft" "$tmp_file" && \
+                    ./convert-mail.sh "reply" "$tmp_file" > "$draft" && \
+                    rm "$tmp_file" && \
+                    msmtp --read-envelope-from -t < "$draft" && rm "$draft"
             fi
             confirm_sync="$(printf "Yes\nNo" | fzf --prompt "Sync imap? ")"
             [ "$confirm_sync" = "Yes" ] && mbsync -c "$mbsync_config" -a
@@ -148,12 +151,18 @@ while true; do
             done
         fi
 
-        #TODO
         if [ "$selected_mail_operation" = "edit" ]; then
             "$edit_mail" -c "setfiletype mail" "$mail_path"
             if [ "$(echo "$flags" | grep -o "D")" != "" ]; then
                 confirm_send="$(printf "Yes\nNo" | fzf --prompt "Send this draft? ")"
-                [ "$confirm_send" = "Yes" ] && msmtp --read-envelope-from -t < "$draft" && rm "$draft"
+                if [ "$confirm_send" = "Yes" ]; then
+                    mail_type="$(basename "$mail_path" | cut -d "-" -f 1)"
+                    [ "$mail_type" != "" ] && tmp_file="$mail_path$(date +%s)" && \
+                        cp "$mail_path" "$tmp_file" && \
+                        ./convert-mail.sh "$mail_type" "$tmp_file" > "$mail_path" && \
+                        rm "$tmp_file" && \
+                        msmtp --read-envelope-from -t < "$mail_path" && rm "$mail_path"
+                fi
                 confirm_sync="$(printf "Yes\nNo" | fzf --prompt "Sync imap? ")"
                 [ "$confirm_sync" = "Yes" ] && mbsync -c "$mbsync_config" -a
                 render=true
