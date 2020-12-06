@@ -155,3 +155,125 @@ if [ "$1" = "reply" ]; then
     fi
 fi
 
+if [ "$1" = "forward" ]; then
+    content_delimiter_start="# content below this line (dont delete this line)"
+    content_delimiter_end="# content above this line (dont delete this line)"
+    attachments="$(grep "Attachments: " "$2" | cut  -c 13- | tr ";" "\n")"
+    start_new_content="$(grep "$content_delimiter_start" -n "$2" | head -n 1 | cut -d ":" -f 1)"
+    end_new_content="$(grep "$content_delimiter_end" -n "$2" | head -n 1 | cut -d ":" -f 1)"
+    headers="$(head -n "$((start_new_content - 1))" "$2" | sed '/^[[:space:]]*$/d' | grep -vE "(Attachments:|Old-From:|Date:|Old-Date:|Old-Cc:|Old-Bcc:|Old-To:|Old-Subject:)")"
+    content_type_main="$(grep "Content-Type:" "$2" | head -n 1)"
+    new_content_text="$(sed -n "$((start_new_content + 1)),$((end_new_content - 1))"p "$2")"
+    new_content_html="$(printf "<div>\n%s</br>\n</div>\n\n" "$(sed -n "$((start_new_content + 1)),$((end_new_content - 1))"p "$2" | sed ':a;N;$!ba;s/\n/<br\/>\n/g')")"
+    start_old_content="$(grep "$content_delimiter_end" -n "$2" | cut -d ":" -f 1)"
+
+    orig_from="$(grep "Old-From: " "$2" | cut -c 10-)"
+    orig_date="$(date -d "$(grep "Old-Date: " "$2" | cut -c 10-)" +"%a, %b %-d, %Y at %H:%M")"
+    orig_subject="$(grep "Old-Subject: " "$2" | cut -c 13- | cut -d "+" -f 2)"
+    orig_to="$(grep "Old-To: " "$2" | cut -c 8-)"
+    orig_cc="$(grep "Old-Cc: " "$2" | cut -c 8-)"
+    orig_bcc="$(grep "Old-Bcc: " "$2" | cut -c 9-)"
+    forward_header_text="$(printf "\n---------- Forwarded message ---------\nFrom: %s\nDate: %s\nSubject: %s\nTo: %s\nCc: %s\nBcc: %s\n\n" "$orig_from" "$orig_date" "$orig_subject" "$orig_to" "$orig_cc" "$orig_bcc")"
+    forward_header_html="$(printf "<div>\n%s</div>" "$(echo "$forward_header_text" | sed ':a;N;$!ba;s/\n/<br\/>\n/g')")"
+
+    # html and text in mail and maybe attachments
+    if [ "$(echo "$content_type_main" | grep "multipart/mixed")" != "" ]; then
+        boundarys="$(grep -E "boundary=\".*\"" "$2" | cut -d "\"" -f 2)"
+        boundarys_regex="$(echo "$boundarys" | tr "\n" "|" )"
+        boundarys_regex="(${boundarys_regex%?})"
+        boundary_main="$(echo "$boundarys" | head -n 1)"
+
+        printf "%s\n\n" "$headers"
+        tail -n +"$((start_old_content + 1))" "$2" | \
+            awk -v boundarys_regex="$boundarys_regex" -v forward_header_text="$forward_header_text" \
+                -v forward_header_html="$forward_header_html" -v new_content_text="$new_content_text" \
+                -v new_content_html="$new_content_html" -v boundary_main="$boundary_main" \
+                'BEGIN {text_area=0; skip=0; html_area=0; text_done=0;}
+                {if (match($0,"Content-Type: text/plain") && (! text_done)) {
+                    print
+                    text_area=1
+                    skip=1
+                } else if (match($0, "--" boundary_main "--$")) {
+                    # prevent print
+                } else if (match($0, "Content-Type: text/html")) {
+                    print $0 "\n\n" new_content_html "\n\n" forward_header_html
+                    html_area=1
+                    skip=1
+                } else if ((text_area || html_area) && match($0, "--" boundarys_regex "$")) {
+                    print "\n" $0
+                    text_area=0
+                    html_area=0
+                    text_done=1
+                } else if (text_area) {
+                    if (! skip) {
+                        print
+                    } else {
+                        print "\n" new_content_text "\n\n" forward_header_text "\n"
+                    }
+                    skip=0
+                } else {
+                    print
+                }}'
+
+        for attachment in $attachments; do
+            filename="$(basename "$attachment")"
+            [ ! -f "$attachment" ] && continue
+            printf "%s" "--${boundary_main}"
+            printf "\nContent-Type: text/plain; charset=\"UTF-8\"; name=\"%s\"\n" "$filename"
+            printf "Content-Disposition: attachment; filename=\"%s\"\n" "$filename"
+            printf "Content-Transfer-Encoding: base64\n\n"
+            base64 "$attachment"
+        done
+
+        printf "%s%s\n" "--" "$boundary_main--"
+        exit
+    fi
+
+    # text mail and no attachments
+    if [ "$(echo "$content_type_main" | grep "text/plain")" != "" ] && [ "$(echo "$attachments" | tr -d " ")" = "" ]; then
+        printf "%s\n\n" "$headers"
+        printf "%s\n\n" "$new_content_text"
+        printf "%s\n\n" "$forward_header_text"
+        tail -n +"$((start_old_content + 1))" "$2" | awk '{print}'
+        exit
+    fi
+
+    # text mail and attachments
+    if [ "$(echo "$content_type_main" | grep "text/plain")" != "" ] && [ "$(echo "$attachments" | tr -d " ")" != "" ]; then
+        mime="MIME-Version: 1.0"
+        header_boundary="$(boundary_generator)"
+        mailtext_boundary="$(boundary_generator)"
+        headers="$(head -n "$((start_new_content - 1))" "$2" | sed '/^[[:space:]]*$/d' | \
+            grep -vE "(Attachments:|Old-From:|Date:|Content-Type:|Old-Date:|Old-Cc:|Old-Bcc:|Old-To:|Old-Subject:)")"
+        full_header="$(printf "%s\n%s\nContent-Type: multipart/mixed; boundary=\"%s\"\n" "$mime" "$headers" "$header_boundary" )"
+
+        printf "%s\n\n" "$full_header"
+        printf "%s\n" "--$header_boundary"
+        printf "Content-Type: multipart/alternative; boundary=\"%s\"\n" "$mailtext_boundary"
+        printf "\n%s\n" "--$mailtext_boundary"
+        printf "Content-Type: text/plain; charset=\"UTF-8\"\n\n"
+        printf "%s\n\n" "$new_content_text"
+        printf "%s\n\n" "$forward_header_text"
+        tail -n +"$((start_old_content + 1))" "$2" | awk '{print}'
+        printf "\n%s\n" "--$mailtext_boundary"
+        printf "Content-Type: text/html; charset=\"UTF-8\"\n\n"
+        printf "%s\n\n" "$new_content_html"
+        printf "<div>\n"
+        printf "%s</br>\n\n" "$forward_header_html"
+        tail -n +"$((start_old_content +1))" "$2" | sed ':a;N;$!ba;s/\n/<br\/>\n/g'
+        printf "</div>\n"
+        printf "\n%s" "--$mailtext_boundary--"
+        printf "\n%s" "--$header_boundary"
+        for attachment in $attachments; do
+            filename="$(basename "$attachment")"
+            [ ! -f "$attachment" ] && continue
+            printf "\nContent-Type: text/plain; charset=\"UTF-8\"; name=\"%s\"\n" "$filename"
+            printf "Content-Disposition: attachment; filename=\"%s\"\n" "$filename"
+            printf "Content-Transfer-Encoding: base64\n\n"
+            base64 "$attachment"
+            printf "%s" "--$header_boundary"
+        done
+        printf "%s\n" "--"
+    fi
+fi
+
