@@ -42,8 +42,10 @@ while true; do
                  ./convert-mail.sh "new" "$tmp_file" > "$draft" && \
                  rm "$tmp_file" && msmtp --read-envelope-from -t < "$draft" && rm "$draft"
         fi
-        confirm_sync="$(printf "Yes\nNo" | fzf --prompt "Sync imap? ")"
-        [ "$confirm_sync" = "Yes" ] && mbsync -c "$mbsync_config" -a
+        if [ "$use_mbsync" = true ]; then
+            confirm_sync="$(printf "Yes\nNo" | fzf --prompt "Sync imap? ")"
+            [ "$confirm_sync" = "Yes" ] && mbsync -c "$mbsync_config" -a
+        fi
     fi
 
     if [ "$selected_type" = "<Attachment(s)>" ]; then
@@ -118,8 +120,10 @@ while true; do
                     rm "$tmp_file" && \
                     msmtp --read-envelope-from -t < "$draft" && rm "$draft"
             fi
-            confirm_sync="$(printf "Yes\nNo" | fzf --prompt "Sync imap? ")"
-            [ "$confirm_sync" = "Yes" ] && mbsync -c "$mbsync_config" -a
+            if [ "$use_mbsync" = true ]; then
+                confirm_sync="$(printf "Yes\nNo" | fzf --prompt "Sync imap? ")"
+                [ "$confirm_sync" = "Yes" ] && mbsync -c "$mbsync_config" -a
+            fi
         fi
 
         if [ "$selected_mail_operation" = "forward" ]; then
@@ -138,8 +142,10 @@ while true; do
                     rm "$tmp_file" && \
                     msmtp --read-envelope-from -t < "$draft" && rm "$draft"
             fi
-            confirm_sync="$(printf "Yes\nNo" | fzf --prompt "Sync imap? ")"
-            [ "$confirm_sync" = "Yes" ] && mbsync -c "$mbsync_config" -a
+            if [ "$use_mbsync" = true ]; then
+                confirm_sync="$(printf "Yes\nNo" | fzf --prompt "Sync imap? ")"
+                [ "$confirm_sync" = "Yes" ] && mbsync -c "$mbsync_config" -a
+            fi
         fi
 
         if [ "$selected_mail_operation" = "download attachment(s)" ]; then
@@ -167,10 +173,12 @@ while true; do
                         ./convert-mail.sh "$mail_type" "$tmp_file" > "$mail_path" && \
                         rm "$tmp_file" && \
                         msmtp --read-envelope-from -t < "$mail_path" && rm "$mail_path"
+                        render=true
                 fi
-                confirm_sync="$(printf "Yes\nNo" | fzf --prompt "Sync imap? ")"
-                [ "$confirm_sync" = "Yes" ] && mbsync -c "$mbsync_config" -a
-                render=true
+                if [ "$use_mbsync" = true ]; then
+                    confirm_sync="$(printf "Yes\nNo" | fzf --prompt "Sync imap? ")"
+                    [ "$confirm_sync" = "Yes" ] && mbsync -c "$mbsync_config" -a
+                fi
             fi
         fi
     fi

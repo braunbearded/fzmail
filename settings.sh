@@ -28,4 +28,5 @@ fzf_header="row   |id |profile                  |folder;flags|date     |mails;su
 
 fzf_pre_folder_header="--------------------------------------------------------"
 
+use_mbsync=false
 mbsync_config="$HOME/.config/isyncrc"
