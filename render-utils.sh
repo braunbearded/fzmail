@@ -38,6 +38,162 @@ render_folder_content() {
                     "ROW_PL", "PPL", "PROFILE_NAME_PL", "FOIDPL", i++, $1, $2, $3, $4}'
 }
 
+trim() {
+    sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//'
+}
+
+init_cache() {
+    #$1 = path to profile
+    #$2 = cache destination
+
+    max_profile_id_length="$(cut -d "|" -f 1 "$1" | wc -L)"
+    max_profile_name_length="$(cut -d "|" -f 2 "$1" | wc -L)"
+    max_id_length="$(while read -r profile_line; do profile_path="$(echo "$profile_line" | cut -d "|" -f 4)"; find "$profile_path" -type f ! -name ".uidvalidity" ! -name ".mbsyncstate"; done < "$1" | wc -l | wc -L)"
+    max_folder_length="$(while read -r profile_line; do profile_path="$(echo "$profile_line" | cut -d "|" -f 4)"; profile_path_length="$(echo "$profile_path" | wc -L)"; find "$profile_path" -type d -name "new" | cut -c "$((profile_path_length + 2))"- | rev | cut -c 5-; done < "$1" | wc -L)"
+    max_flag_length="$(while read -r profile_line; do profile_path="$(echo "$profile_line" | cut -d "|" -f 4)"; find "$profile_path" -type f ! -name ".uidvalidity" ! -name ".mbsyncstate" | cut -d "," -f 3; done < "$1" | wc -L)"
+    max_folder_id_length="$(while read -r profile_line; do profile_path="$(echo "$profile_line" | cut -d "|" -f 4)"; find "$profile_path" -type d; done < "$1" | wc -l | wc -L)"
+    max_subject_length="20"
+    max_from_length="20"
+    max_date_length="10"
+    max_entry_length="$((max_profile_id_length + max_profile_id_length + \
+        max_id_length + max_folder_length + max_flag_length + \
+        max_folder_id_length + max_subject_length + max_from_length + \
+        max_date_length + 12))"
+
+    printf "%s|%s|%s|%s|%s|%s|%s|%s" "$max_profile_id_length" "$max_profile_name_length" \
+        "$max_id_length" "$max_folder_length" "$max_flag_length" \
+        "$max_folder_id_length" "$max_entry_length" "$max_date_length" > "$2/max_field_lengths"
+
+    while read -r profile_line; do
+        profile_id="$(echo "$profile_line" | awk -F "|" '{print $1}')";
+        profile_path="$(echo "$profile_line" | awk -F "|" '{print $4}')";
+        profile_path_length="$(echo "$profile_path" | wc -L)"
+        profile_name="$(echo "$profile_line" | awk -F "|" '{print $2}')";
+
+        cache_profile_path="$2/$profile_id"
+        mkdir -p "$cache_profile_path"
+        [ -f "$cache_profile_path/selected_folders" ] && rm "$cache_profile_path/selected_folders"
+        touch "$cache_profile_path/selected_folders"
+
+        find "$profile_path" -type d | grep "new" | sort | \
+            awk -v profile_path_length="$profile_path_length" \
+            '{short_folder=substr($0, profile_path_length + 2); printf "%s|%s\n", substr($0, 0, length($0) - 4), substr(short_folder, 0, length(short_folder) - 4)}' > "$cache_profile_path/profile_folders"
+
+        folder_id=1
+        while read -r folder; do
+            folder_short="$(echo "$folder" | cut -d "|" -f 2)"
+            max_mail_id_length="$(find "$profile_path/$folder_short" -type f ! -name ".uidvalidity" ! -name ".mbsyncstate" | wc -l | wc -L)"
+            mkdir -p "$cache_profile_path/$folder_id"
+            mail_id=1
+
+            find "$profile_path/$folder_short" -type f ! -name ".uidvalidity" ! -name ".mbsyncstate" | sort > "$cache_profile_path/$folder_id/mails"
+            folder_padding_length="$((max_folder_length - max_folder_id_length - max_mail_id_length - max_flag_length - max_date_length - 4))"
+            while read -r mail; do
+                subject="$(mshow -q -h subject "$mail" | cut -d ":" -f 2 | trim | cut -c -"$max_subject_length")";
+                date="$(mshow -q -h date "$mail" | cut -d ":" -f 2 | trim | cut -c -"$max_date_length")"
+                from="$(mshow -q -h from "$mail" | cut -d ":" -f 2 | trim | cut -c -"$max_from_length")";
+                flags="U$(echo "$mail" | grep -oE "2,.*" | cut -c 3-)";
+                [ "$(echo "$flags" | grep -o "S")" != "" ] && flags="$(echo "$flags" | tr -d "U" | tr -d "S")";
+                attachment="$(grep -o "Content-Disposition: attachment;" "$mail")"
+                [ "$attachment" != "" ] && flags="${flags}A";
+                printf "%-*s|%-*s|%-*s|%-*s|%-*s|%-*s|%-*s|%-*s|%-*s|%-*s\n" \
+                    "$max_id_length" "R" "$max_profile_id_length" "$profile_id" \
+                    "$max_profile_name_length" "$profile_name" "$folder_padding_length" " "\
+                    "$max_folder_id_length" "$folder_id" "$max_mail_id_length" \
+                    "$mail_id" "$max_flag_length" "$flags" "$max_date_length" \
+                    "$date" "$max_from_length" "$from" "$max_subject_length" \
+                    "$subject" >> "$cache_profile_path/$folder_id/formated_mails"
+                mail_id="$((mail_id + 1))"
+            done < "$cache_profile_path/$folder_id/mails"
+            folder_id="$((folder_id + 1))"
+        done < "$cache_profile_path/profile_folders"
+    done < "$1"
+
+}
+
+render() {
+    #$1 = path to profile
+    #$2 = cache destination
+
+    max_profile_id_length="$(cut -d "|" -f 1 "$2/max_field_lengths")"
+    max_profile_name_length="$(cut -d "|" -f 2 "$2/max_field_lengths")"
+    max_id_length="$(cut -d "|" -f 3 "$2/max_field_lengths")"
+    max_folder_length="$(cut -d "|" -f 4 "$2/max_field_lengths")"
+    max_entry_length="$(cut -d "|" -f 7 "$2/max_field_lengths")"
+    header_marker="$(printf "%*s" "$max_entry_length" " " | tr " " "-")"
+    row_id_place_padding="$(printf "%*s" "$((max_id_length - 1))" " ")"
+
+    row_id=1
+    while read -r profile_line; do
+        profile_id="$(echo "$profile_line" | awk -F "|" '{print $1}')";
+        profile_name="$(echo "$profile_line" | awk -F "|" '{print $2}')";
+        cache_profile_path="$2/$profile_id"
+        folder_id=1
+
+        printf "%s\n" "$header_marker"
+        printf "%-*s|%-*s|%-*s\n" "$max_id_length" "$row_id" \
+            "$max_profile_id_length" "$profile_id" "$max_profile_name_length" \
+            "$profile_name"
+        printf "%s\n" "$header_marker"
+
+        row_id="$((row_id + 1))"
+        while read -r folder; do
+            folder_short="$(echo "$folder" | cut -d "|" -f 2)"
+            printf "%-*s|%-*s|%-*s|%-*s|\n" "$max_id_length" "$row_id" \
+                "$max_profile_id_length" "$profile_id" "$max_profile_name_length" \
+                "$profile_name" "$max_folder_length" "$folder_short"
+            row_id="$((row_id + 1))"
+            if [ "$(grep -oE "^$folder_short$" "$cache_profile_path/selected_folders")" != "" ]; then
+                while read -r mail; do
+                    echo "$mail" | sed "s/R$row_id_place_padding/$(printf "%*s" "$max_id_length" "$row_id")/"
+                    row_id="$((row_id + 1))"
+                done < "cache_profile_path/$folder_id/formated_mails"
+            fi
+            folder_id="$((folder_id + 1))"
+        done < "$cache_profile_path/profile_folders"
+    done < "$1"
+}
+
+render_tree2() {
+    max_profile_id_length="$(cut -d "|" -f 1 "$2/max_field_lengths")"
+    max_profile_name_length="$(cut -d "|" -f 2 "$2/max_field_lengths")"
+    max_id_length="$(cut -d "|" -f 3 "$2/max_field_lengths")"
+    max_folder_length="$(cut -d "|" -f 4 "$2/max_field_lengths")"
+    max_entry_length="$(cut -d "|" -f 7 "$2/max_field_lengths")"
+    header_marker="$(printf "%*s" "$max_entry_length" " " | tr " " "-")"
+    row_id_place_padding="$(printf "%*s" "$((max_id_length - 1))" " ")"
+
+    row_id=1
+    while read -r profile_line; do
+        profile_id="$(echo "$profile_line" | awk -F "|" '{print $1}')";
+        profile_name="$(echo "$profile_line" | awk -F "|" '{print $2}')";
+        folder_id=1
+
+        printf "%s\n" "$header_marker"
+        printf "%-*s|%-*s|%-*s\n" "$max_id_length" "$row_id" \
+            "$max_profile_id_length" "$profile_id" "$max_profile_name_length" \
+            "$profile_name"
+        printf "%s\n" "$header_marker"
+
+        if [ -f "$2/$profile_id/profile_folders" ]; then
+            while read -r folder; do
+                folder_short="$(echo "$folder" | cut -d "|" -f 2)"
+                printf "%-*s|%-*s|%-*s|%-*s|\n" "$max_id_length" "$row_id" \
+                    "$max_profile_id_length" "$profile_id" "$max_profile_name_length" \
+                    "$profile_name" "$max_folder_length" "$folder_short"
+                row_id="$((row_id + 1))"
+                if [ -f "$2/$profile_id/$folder_id/formated_mails" ]; then
+                    while read -r mail; do
+                        echo "$mail" | sed "s/R$row_id_place_padding/$(printf "%*s" "$max_id_length" "$row_id")/"
+                        row_id="$((row_id + 1))"
+                    done < "$2/$profile_id/$folder_id/formated_mails"
+                fi
+                folder_id="$((folder_id + 1))"
+            done < "$2/$profile_id/profile_folders"
+        fi
+    done < "$1"
+}
+
 render_tree() {
     #$1 = path to config
     # Optional: render folder content

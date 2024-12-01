@@ -24,11 +24,11 @@ if [ "$op" = "new" ] && [ -d "$draft_path" ]; then
 
     content="# content below this line (dont delete this line)"
     message_id="$(mgenmid)"
-    new_path="$(printf "To: %s\nCc: %s\nBcc: %s\nFrom: %s\nMessage-Id: %s\nAttachments:\nSubject: %s\n%s\n%s\n\n" \
+    printf "To: %s\nCc: %s\nBcc: %s\nFrom: %s\nMessage-Id: %s\nAttachments:\nSubject: %s\n%s\n%s\n\n" \
         "$to" "$cc" "$bcc" "$from" "$message_id" "$subject" "$other_header" "$content" | \
-        mdeliver -v -c -X"$flag" "$draft_path")"
-    new_path_type="$(dirname "$new_path")"/new-"$(basename "$new_path")"
-    mv "$new_path" "$new_path_type" && echo "$new_path_type"
+        mdeliver -v -c -X"$flag" "$draft_path"
+    # new_path_type="$(dirname "$new_path")"/"$(basename "$new_path")"
+    # mv "$new_path" "$new_path_type" && echo "$new_path_type"
 fi
 
 if [ "$op" = "forward" ] && [ -d "$draft_path" ]; then

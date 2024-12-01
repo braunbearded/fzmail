@@ -12,7 +12,9 @@ render=true
 current_folder=''
 while true; do
     if [ "$render" = true ]; then
-        tree="$(render_tree "$profiles" "$selected_profile_id" "$folder")"
+        # tree="$(render_tree "$profiles" "$selected_profile_id" "$folder")"
+        init_cache "$profiles" "$cache_path"
+        tree="$(render_tree2 "$profiles" "$cache_path")"
         render=false
     fi
 

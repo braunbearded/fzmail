@@ -30,3 +30,9 @@ fzf_pre_folder_header="--------------------------------------------------------"
 
 use_mbsync=false
 mbsync_config="$HOME/.config/isyncrc"
+
+cache_path="./cache"
+
+tree_header_delimiter="----------------------------------------------------------------------------------------------------"
+
+max_row_length="30"
